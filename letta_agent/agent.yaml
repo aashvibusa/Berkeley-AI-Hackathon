@@ -7,16 +7,6 @@ tools:
     input_type: string
     output_type: string
 
-  - id: get_context
-    description: Grabs visible text from current page.
-    input_type: null
-    output_type: string
-
-  - id: analyze
-    description: Analyzes screenshot or image to extract text or language context.
-    input_type: image
-    output_type: string
-
   - id: translate
     description: Translates or explains language phrases.
     input_type: string
@@ -43,10 +33,6 @@ memory:
 
 plan:
   - tool: speech_input
-  - tool: get_context
-    if: input contains "context" or input contains "page"
-  - tool: analyze
-    if: input contains "image" or input contains "screenshot"
   - tool: translate
   - tool: save
   - tool: speech_output

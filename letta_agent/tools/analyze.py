@@ -1,1 +1,0 @@
-# Analyzes screenshot or image to extract text or language context.
