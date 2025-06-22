@@ -5,7 +5,9 @@
   "description": "Language learning made simple with text highlighting and translation",
   "permissions": [
     "activeTab",
-    "storage"
+    "storage",
+    "tabCapture",
+    "tabs"
   ],
   "host_permissions": [
     "http://localhost:8000/*"
@@ -19,5 +21,8 @@
       "matches": ["<all_urls>"],
       "js": ["content.js"]
     }
-  ]
+  ],
+  "background": {
+    "service_worker": "background.js"
+  }
 } 

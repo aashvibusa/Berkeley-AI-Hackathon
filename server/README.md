@@ -1,14 +1,16 @@
 # FastAPI Highlight Logger Server
 
-A FastAPI server that receives highlighted text via a POST endpoint, prints it to the console, forwards it to the Letta AI server for vocabulary saving, provides translation services using Groq API, and maintains persistent user state in a JSON store.
+A FastAPI server that receives highlighted text via a POST endpoint, prints it to the console, forwards it to the Letta AI server for vocabulary saving, provides translation services using Groq API, maintains persistent user state in a JSON store, and includes real-time audio streaming with speech-to-text transcription using Whisper.
 
 ## Features
 
 - POST `/highlight` endpoint that accepts JSON with a "highlight" key
-- POST `/translate` endpoint that translates text to Spanish using Groq API
+- POST `/translate` endpoint that translates text using Groq API with dynamic language preferences
+- WebSocket `/ws/audio` endpoint for real-time audio streaming and transcription
 - Persistent state management with JSON store (`store.json`)
 - User data management with source/target languages and highlighted words
-- Prints received highlights to the server console
+- Real-time audio capture and transcription using OpenAI Whisper
+- Prints received highlights and transcribed audio to the server console
 - Forwards highlights to Letta AI server for vocabulary saving
 - Returns JSON response with status and highlight information
 - Built-in API documentation at `/docs`
@@ -186,9 +188,40 @@ The server maintains persistent state in `store.json` with the following structu
     "message": "Text translated successfully",
     "original_text": "Hello world",
     "translated_text": "Hola mundo",
-    "language": "Spanish"
+    "source_language": "English",
+    "target_language": "Spanish"
 }
 ```
+
+### WebSocket `/ws/audio`
+- Real-time WebSocket endpoint for audio streaming
+- Accepts audio data in WebM format with Opus codec
+- Performs speech-to-text transcription using OpenAI Whisper
+- Prints transcribed text to server console
+- Returns transcription results to connected clients
+
+#### WebSocket Connection:
+```javascript
+const websocket = new WebSocket('ws://localhost:8000/ws/audio');
+
+websocket.onopen = () => {
+    console.log('Connected to audio WebSocket');
+};
+
+websocket.onmessage = (event) => {
+    console.log('Transcription result:', event.data);
+};
+
+// Send audio data
+websocket.send(audioBuffer);
+```
+
+#### Server Console Output:
+```
+🎤 Transcribed Audio: Hello, this is a test of the audio transcription system.
+```
+
+## Audio Streaming Integration
 
 ## Letta AI Integration
 

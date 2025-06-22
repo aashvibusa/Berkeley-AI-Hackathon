@@ -1,11 +1,12 @@
 # Glossa - Language Learning Chrome Extension
 
-A comprehensive Chrome extension for language learning that combines text highlighting, translation, user authentication, and personalized language preferences.
+A comprehensive Chrome extension for language learning that combines text highlighting, translation, audio listening, user authentication, and personalized language preferences.
 
 ## Features
 
 - **Text Highlighting**: Detect and save highlighted text from any webpage
 - **Real-time Translation**: Automatic translation to target language using Groq API
+- **Audio Listening**: Capture and transcribe audio from the current tab using Whisper
 - **User Authentication**: Secure login/register system with password hashing
 - **Language Preferences**: Customizable source and target languages with country flags
 - **Persistent Storage**: User data and preferences saved locally and on server
@@ -38,6 +39,13 @@ Make sure the FastAPI server is running at `http://localhost:8000` with all endp
 2. **Watch the popup appear** with original text and translation
 3. **Press Shift** to save the word to your vocabulary
 4. **Check your progress** in the extension popup
+
+### Audio Listening
+1. **Open the extension popup**
+2. **Toggle the "Listen to Tab Audio" switch** in the Audio Listening section
+3. **Play audio** in the current tab (YouTube, podcasts, etc.)
+4. **View transcribed text** in the FastAPI server console
+5. **Toggle off** when finished listening
 
 ### Language Management
 1. **Open the extension popup**

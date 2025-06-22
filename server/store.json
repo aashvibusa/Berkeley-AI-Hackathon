@@ -6,7 +6,9 @@
       "highlighted_words": [
         "Create a new organization",
         "Supabase",
-        "Updates"
+        "Updates",
+        "hobbyists",
+        "chrome.action.onClicked.addListener((tab) => {\n  chrome.tabCapture.capture(\n    { audio: true, video: false },\n    (stream) => {\n      if (chrome.runtime.lastError) {\n        console.error('Capture failed:', chrome.runtime.lastError.message);\n      } else {\n        console.log('Captured stream:', stream);\n      }\n    }\n  );\n});"
       ]
     },
     "kai": {
@@ -16,8 +18,10 @@
     },
     "kai1": {
       "source_language": "en",
-      "target_language": "ja",
-      "highlighted_words": [],
+      "target_language": "es",
+      "highlighted_words": [
+        "chrome.action.onClicked.addListener((tab) => {\n  chrome.tabCapture.capture(\n    { audio: true, video: false },\n    (stream) => {\n      if (chrome.runtime.lastError) {\n        console.error('Capture failed:', chrome.runtime.lastError.message);\n      } else {\n        console.log('Captured stream:', stream);\n      }\n    }\n  );\n});"
+      ],
       "password": "f4139231c3705847426be9624dbdd975dc640c4e0bb7140071b69cbc1c6b9c74"
     }
   }

@@ -209,12 +209,21 @@ async function handleRegister() {
 function setupDashboardListeners() {
     const saveSettingsBtn = document.getElementById('save-settings-btn');
     const logoutBtn = document.getElementById('logout-btn');
+    const listeningToggle = document.getElementById('listening-toggle');
     
     saveSettingsBtn.addEventListener('click', saveSettings);
     logoutBtn.addEventListener('click', handleLogout);
+    listeningToggle.addEventListener('change', handleListeningToggle);
     
     // Language selector listeners
     setupLanguageSelectors();
+    
+    // Listen for status changes from background script
+    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+        if (request.action === 'listeningStatusChanged') {
+            updateListeningStatus(request.isListening);
+        }
+    });
 }
 
 async function loadUserData() {
@@ -377,6 +386,35 @@ async function handleLogout() {
         showLogin();
     } catch (error) {
         console.error('Logout error:', error);
+    }
+}
+
+function handleListeningToggle(event) {
+    const isEnabled = event.target.checked;
+    
+    // Send message to background script
+    chrome.runtime.sendMessage({
+        action: 'toggleListening',
+        enabled: isEnabled
+    }, (response) => {
+        if (!response || !response.success) {
+            console.error('Failed to toggle listening mode');
+            // Revert the toggle if it failed
+            event.target.checked = !isEnabled;
+        }
+    });
+}
+
+function updateListeningStatus(isListening) {
+    const statusElement = document.getElementById('listening-status');
+    const toggle = document.getElementById('listening-toggle');
+    
+    if (isListening) {
+        statusElement.classList.remove('hidden');
+        toggle.checked = true;
+    } else {
+        statusElement.classList.add('hidden');
+        toggle.checked = false;
     }
 }
 

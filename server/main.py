@@ -1,9 +1,14 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
 import os
 import httpx
+import whisper
+import tempfile
+import io
+import wave
+import numpy as np
 from typing import Optional
 from dotenv import load_dotenv
 from state_manager import StateManager
@@ -30,6 +35,39 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 # Initialize state manager
 state_manager = StateManager()
+
+# Initialize Whisper model
+print("Loading Whisper model...")
+whisper_model = whisper.load_model("base")
+print("Whisper model loaded successfully!")
+
+# WebSocket connection manager
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: list[WebSocket] = []
+        self.is_listening = False
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+        print(f"WebSocket connected. Total connections: {len(self.active_connections)}")
+
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.remove(websocket)
+        print(f"WebSocket disconnected. Total connections: {len(self.active_connections)}")
+
+    async def send_personal_message(self, message: str, websocket: WebSocket):
+        await websocket.send_text(message)
+
+    async def broadcast(self, message: str):
+        for connection in self.active_connections:
+            try:
+                await connection.send_text(message)
+            except:
+                # Remove broken connections
+                self.active_connections.remove(connection)
+
+manager = ConnectionManager()
 
 # Language code to full name mapping
 LANGUAGE_MAP = {
@@ -266,7 +304,7 @@ Only return the translated text, nothing else."""
                     "Content-Type": "application/json"
                 },
                 json={
-                    "model": "llama3-8b-8192",
+                    "model": "llama-3.3-70b-versatile",
                     "messages": [
                         {
                             "role": "system",
@@ -337,6 +375,61 @@ async def highlight_endpoint(request: HighlightRequest):
     except Exception as e:
         print(f"Error processing highlight: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.websocket("/ws/audio")
+async def websocket_audio_endpoint(websocket: WebSocket):
+    """WebSocket endpoint for receiving audio streams and performing speech-to-text."""
+    await manager.connect(websocket)
+    
+    try:
+        print("Audio WebSocket connection established")
+        
+        while True:
+            # Receive audio data as bytes
+            audio_data = await websocket.receive_bytes()
+            
+            if audio_data:
+                # Process the audio data with Whisper
+                try:
+                    # Convert audio data to format Whisper can process
+                    # Note: This is a simplified approach. In production, you might want to
+                    # accumulate audio chunks and process them in larger segments
+                    
+                    # Create a temporary file for the audio data
+                    with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as temp_file:
+                        temp_file.write(audio_data)
+                        temp_file_path = temp_file.name
+                    
+                    # Transcribe with Whisper
+                    result = whisper_model.transcribe(temp_file_path)
+                    transcribed_text = result["text"].strip()
+                    
+                    # Clean up temporary file
+                    os.unlink(temp_file_path)
+                    
+                    # Print transcribed text to console
+                    if transcribed_text:
+                        print(f"🎤 Transcribed Audio: {transcribed_text}")
+                        
+                        # Send confirmation back to client
+                        await manager.send_personal_message(
+                            f"Transcribed: {transcribed_text}", 
+                            websocket
+                        )
+                    
+                except Exception as e:
+                    print(f"Error processing audio: {e}")
+                    await manager.send_personal_message(
+                        f"Error processing audio: {str(e)}", 
+                        websocket
+                    )
+    
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+        print("Audio WebSocket disconnected")
+    except Exception as e:
+        print(f"WebSocket error: {e}")
+        manager.disconnect(websocket)
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000) 
