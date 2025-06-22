@@ -7,6 +7,7 @@ import httpx
 from typing import Optional
 from dotenv import load_dotenv
 from state_manager import StateManager
+from letta_client import Letta, MessageCreate, TextContent
 
 # Load environment variables from .env file
 load_dotenv()
@@ -27,9 +28,19 @@ LETTA_API_KEY = os.getenv("LETTA_API_KEY")
 LETTA_AGENT_ID = os.getenv("LETTA_AGENT_ID")
 LETTA_BASE_URL = "https://api.letta.ai/v1"
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+print(f"LETTA_API_KEY: {LETTA_API_KEY}")
+print(f"LETTA_AGENT_ID: {LETTA_AGENT_ID}")
+print(f"LETTA_BASE_URL: {LETTA_BASE_URL}")
+print(f"GROQ_API_KEY: {GROQ_API_KEY}")
 
 # Initialize state manager
 state_manager = StateManager()
+
+# Initialize Letta client
+if LETTA_API_KEY:
+    letta_client = Letta(token=LETTA_API_KEY)
+else:
+    letta_client = None
 
 # Language code to full name mapping
 LANGUAGE_MAP = {
@@ -86,6 +97,17 @@ class LoginRequest(BaseModel):
 class RegisterRequest(BaseModel):
     user_id: str
     password: str
+    first_name: str
+    last_name: str
+
+class SetPreferencesRequest(BaseModel):
+    user_id: str
+    experience_level: str
+    learning_goal: str
+    practice_frequency: str
+
+class ChatMessageRequest(BaseModel):
+    text: str
 
 @app.get("/")
 async def root():
@@ -115,27 +137,20 @@ async def register_user(request: RegisterRequest):
         
         # Create new user with hashed password
         state_manager.store["users"][request.user_id] = {
+            "first_name": request.first_name,
+            "last_name": request.last_name,
+            "password": request.password,  # Store hashed password
             "source_language": "auto",
             "target_language": "Spanish",
             "highlighted_words": [],
-            "password": request.password  # Store hashed password
+            "preferences_set": False
         }
-        
-        # Save to store
         state_manager.save_store()
         
-        # Return user data (without password)
         user_data = state_manager.get_user(request.user_id)
-        user_data.pop("password", None)  # Remove password from response
+        user_data.pop("password", None)
         
-        return {
-            "status": "success",
-            "message": "User registered successfully",
-            "user": {
-                "user_id": request.user_id,
-                "data": user_data
-            }
-        }
+        return {"username": request.user_id, **user_data, "is_new_user": True}
     except Exception as e:
         print(f"Error registering user: {e}")
         raise HTTPException(status_code=500, detail="Registration failed")
@@ -159,19 +174,63 @@ async def login_user(request: LoginRequest):
         user_data_copy = user_data.copy()
         user_data_copy.pop("password", None)  # Remove password from response
         
-        return {
-            "status": "success",
-            "message": "Login successful",
-            "user": {
-                "user_id": request.user_id,
-                "data": user_data_copy
-            }
-        }
+        is_new_user = not user_data.get("preferences_set", False)
+
+        return {"username": request.user_id, **user_data_copy, "is_new_user": is_new_user}
     except HTTPException:
         raise
     except Exception as e:
         print(f"Error logging in user: {e}")
         raise HTTPException(status_code=500, detail="Login failed")
+
+@app.post("/users/set-preferences")
+async def set_preferences(request: SetPreferencesRequest):
+    """Set user preferences and inform the Letta agent."""
+    user_id = request.user_id
+    if not letta_client or not LETTA_AGENT_ID:
+        raise HTTPException(status_code=500, detail="Letta API not configured")
+
+    memory = {"human": {}}
+
+    # 1. Fetch memory from Letta
+    try:
+        retrieved_block = letta_client.blocks.retrieve(block_id=user_id)
+        if retrieved_block and retrieved_block.get("memory") and retrieved_block.get("memory", {}).get("human"):
+             memory["human"] = retrieved_block["memory"]["human"]
+    except Exception as e:
+        # A 404 for a new user would be caught here, which is acceptable.
+        print(f"Could not retrieve memory from Letta (this might be expected for a new user): {e}")
+
+    # 2. Prepare the data for the Letta agent
+    new_preferences = {
+        "experience_level": request.experience_level,
+        "learning_goal": request.learning_goal,
+        "practice_frequency": request.practice_frequency,
+    }
+
+    # 3. Call the Letta agent's set_preferences tool
+    try:
+        tool_name = "set_preferences"
+        letta_client.agents.tools.run(
+            agent_id=LETTA_AGENT_ID,
+            tool_name=tool_name,
+            input=new_preferences,
+            memory=memory,
+        )
+    except Exception as e:
+        print(f"Error from Letta API: {e}")
+        # Continuing to ensure our DB gets updated regardless of Letta's status.
+
+    # 4. Update the user's preferences in our database
+    user_data = state_manager.get_user(user_id)
+    if not user_data:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    state_manager.store["users"][user_id]["preferences"] = new_preferences
+    state_manager.store["users"][user_id]["preferences_set"] = True
+    state_manager.save_store()
+
+    return {"status": "success", "message": "Preferences updated successfully."}
 
 @app.post("/users/languages")
 async def update_user_languages(request: UserLanguageRequest):
@@ -337,6 +396,69 @@ async def highlight_endpoint(request: HighlightRequest):
     except Exception as e:
         print(f"Error processing highlight: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.post("/chat/send-message")
+async def send_message(request: ChatMessageRequest):
+    """
+    Send a message to the Letta agent and get the latest response.
+    
+    NOTE: The current version of letta-client does not seem to support
+    multi-user conversations via a user_id parameter. These calls will
+    therefore be made in a shared context.
+    """
+    text = request.text
+    if not letta_client or not LETTA_AGENT_ID:
+        raise HTTPException(status_code=500, detail="Letta API not configured")
+
+    try:
+        # Send user message to Letta and return the agent's response
+        response_messages = letta_client.agents.messages.create(
+            agent_id=LETTA_AGENT_ID,
+            messages=[MessageCreate(role="user", content=[TextContent(text=text)])],
+        )
+        return {"messages": response_messages}
+
+    except Exception as e:
+        print(f"Error sending message to Letta: {e}")
+        raise HTTPException(status_code=500, detail="Failed to send message to agent")
+
+@app.get("/chat/get-messages")
+async def get_messages(user_id: str):
+    """
+    Get all messages for a user from the Letta agent.
+
+    NOTE: The current version of letta-client does not seem to support
+    multi-user conversations via a user_id parameter. These calls will
+    therefore be made in a shared context.
+    """
+    if not letta_client or not LETTA_AGENT_ID:
+        raise HTTPException(status_code=500, detail="Letta API not configured")
+
+    try:
+        messages = letta_client.agents.messages.list(
+            agent_id=LETTA_AGENT_ID
+        )
+        return {"messages": messages}
+            
+    except Exception as e:
+        print(f"Error getting messages from Letta: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get messages from agent")
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+        raise HTTPException(status_code=500, detail="An internal error occurred")
+
+@app.get("/users/{user_id}/stats")
+async def get_user_stats(user_id: str):
+    """Get user statistics."""
+    user_data = state_manager.get_user(user_id)
+    if not user_data:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    return {
+        "total_words": len(user_data.get("highlighted_words", [])),
+        "words_mastered": 0,  # Placeholder
+        "lessons_completed": 0, # Placeholder
+    }
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000) 

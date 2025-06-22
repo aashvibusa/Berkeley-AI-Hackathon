@@ -19,6 +19,37 @@
       "target_language": "ja",
       "highlighted_words": [],
       "password": "f4139231c3705847426be9624dbdd975dc640c4e0bb7140071b69cbc1c6b9c74"
+    },
+    "a": {
+      "source_language": "auto",
+      "target_language": "Spanish",
+      "highlighted_words": [],
+      "password": "a",
+      "first_name": "abc",
+      "last_name": "def",
+      "preferences_set": false
+    },
+    "abc": {
+      "source_language": "auto",
+      "target_language": "Spanish",
+      "highlighted_words": [],
+      "password": "123",
+      "first_name": "a",
+      "last_name": "a",
+      "preferences_set": false
+    },
+    "b": {
+      "first_name": "b",
+      "last_name": "b",
+      "source_language": "auto",
+      "target_language": "Spanish",
+      "highlighted_words": [],
+      "preferences_set": true,
+      "preferences": {
+        "experience_level": "beginner",
+        "learning_goal": "conversational",
+        "practice_frequency": "2-3 times a week"
+      }
     }
   }
 }

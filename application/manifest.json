@@ -1,0 +1,19 @@
+{
+    "manifest_version": 3,
+    "name": "LangLearner",
+    "version": "1.0",
+    "description": "Language learning assistant extension",
+  
+    "permissions": [
+      "storage",
+      "notifications",
+      "contextMenus",
+      "activeTab",
+      "scripting"
+    ],
+  
+    "host_permissions": [
+      "<all_urls>"
+    ]
+  }
+  
