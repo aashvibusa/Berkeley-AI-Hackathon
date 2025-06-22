@@ -1,0 +1,9 @@
+# Letta API Configuration
+# Copy this file to .env and fill in your actual values
+LETTA_API_KEY=your_letta_api_key_here
+LETTA_AGENT_ID=your_letta_agent_id_here
+
+# Optional configuration
+DEBUG=False
+PORT=8000
+HOST=0.0.0.0 
