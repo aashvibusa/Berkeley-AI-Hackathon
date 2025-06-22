@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "Text Selection Logger",
+  "version": "1.0",
+  "description": "Logs highlighted text to the console and sends to server",
+  "permissions": [
+    "activeTab"
+  ],
+  "host_permissions": [
+    "http://localhost:8000/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"]
+    }
+  ],
+  "action": {
+    "default_title": "Text Selection Logger"
+  }
+} 
