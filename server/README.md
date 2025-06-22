@@ -1,10 +1,13 @@
 # FastAPI Highlight Logger Server
 
-A FastAPI server that receives highlighted text via a POST endpoint, prints it to the console, and forwards it to the Letta AI server for vocabulary saving.
+A FastAPI server that receives highlighted text via a POST endpoint, prints it to the console, forwards it to the Letta AI server for vocabulary saving, provides translation services using Groq API, and maintains persistent user state in a JSON store.
 
 ## Features
 
 - POST `/highlight` endpoint that accepts JSON with a "highlight" key
+- POST `/translate` endpoint that translates text to Spanish using Groq API
+- Persistent state management with JSON store (`store.json`)
+- User data management with source/target languages and highlighted words
 - Prints received highlights to the server console
 - Forwards highlights to Letta AI server for vocabulary saving
 - Returns JSON response with status and highlight information
@@ -24,8 +27,8 @@ pip install -r requirements.txt
 # Copy the template file to .env
 cp env_template.txt .env
 
-# Edit .env with your actual Letta API credentials
-# Replace the placeholder values with your real API key and agent ID
+# Edit .env with your actual API credentials
+# Replace the placeholder values with your real API keys and agent ID
 ```
 
 ## Environment Variables
@@ -37,6 +40,9 @@ Create a `.env` file in the server directory with the following variables:
 LETTA_API_KEY=your_actual_api_key_here
 LETTA_AGENT_ID=your_actual_agent_id_here
 
+# Required: Groq API Configuration (for translation)
+GROQ_API_KEY=your_groq_api_key_here
+
 # Optional: Server Configuration
 DEBUG=False
 PORT=8000
@@ -46,6 +52,7 @@ HOST=0.0.0.0
 ### Required Variables:
 - `LETTA_API_KEY`: Your Letta AI API key
 - `LETTA_AGENT_ID`: Your Letta AI agent ID
+- `GROQ_API_KEY`: Your Groq API key for translation services
 
 ### Optional Variables:
 - `DEBUG`: Set to "True" for debug mode (default: False)
@@ -76,17 +83,60 @@ python load_env.py
 
 This will show you which variables are loaded and validate that required ones are present.
 
+## State Management
+
+The server maintains persistent state in `store.json` with the following structure:
+
+```json
+{
+  "users": {
+    "user_id": {
+      "source_language": "auto",
+      "target_language": "Spanish",
+      "highlighted_words": ["word1", "word2", "word3"]
+    }
+  }
+}
+```
+
+### Store Features:
+- **Automatic loading** on server startup
+- **Automatic saving** whenever state changes
+- **User creation** on first highlight
+- **Duplicate prevention** for highlighted words
+- **Persistent storage** across server restarts
+
 ## API Endpoints
 
 ### GET `/`
 - Returns a simple status message
 - Response: `{"message": "Highlight Logger API is running!"}`
 
+### GET `/store/stats`
+- Returns statistics about the store
+- Response: `{"total_users": 5, "total_highlighted_words": 25, "users": ["user1", "user2"]}`
+
+### GET `/users/{user_id}`
+- Returns user data including languages and highlighted words
+- Creates user if doesn't exist
+
+### POST `/users/languages`
+- Updates user's language preferences
+- Request: `{"user_id": "user1", "source_language": "English", "target_language": "Spanish"}`
+
+### GET `/users/{user_id}/words`
+- Returns user's highlighted words list
+- Response: `{"user_id": "user1", "highlighted_words": ["hello", "world"], "count": 2}`
+
+### DELETE `/users/{user_id}/words/{word}`
+- Removes a word from user's highlighted words list
+
 ### POST `/highlight`
 - Accepts JSON with a "highlight" key and optional "user_id"
 - Prints the highlight to the server console
 - Forwards the request to Letta AI server
-- Returns success response with highlight details and Letta response
+- Saves highlighted word to user's store
+- Returns success response with highlight details, Letta response, and user data
 - CORS enabled for cross-origin requests
 
 #### Request Body:
@@ -107,7 +157,36 @@ This will show you which variables are loaded and validate that required ones ar
     "user_id": "user_abc123",
     "letta_response": {
         "result": "Vocabulary saved successfully"
+    },
+    "user_data": {
+        "source_language": "auto",
+        "target_language": "Spanish",
+        "highlighted_words": ["Your highlighted text here", "previous word"]
     }
+}
+```
+
+### POST `/translate`
+- Accepts JSON with a "text" key
+- Translates the text to Spanish using Groq API
+- Returns the original and translated text
+- CORS enabled for cross-origin requests
+
+#### Request Body:
+```json
+{
+    "text": "Hello world"
+}
+```
+
+#### Response:
+```json
+{
+    "status": "success",
+    "message": "Text translated successfully",
+    "original_text": "Hello world",
+    "translated_text": "Hola mundo",
+    "language": "Spanish"
 }
 ```
 
@@ -126,20 +205,52 @@ POST https://api.letta.ai/v1/agent/{AGENT_ID}/tool/save_vocab/run
 }
 ```
 
-If the environment variables are not set, the server will still log highlights locally but skip the Letta API call.
+## Groq Translation Integration
+
+The server uses Groq API for translation services:
+```
+POST https://api.groq.com/openai/v1/chat/completions
+```
+
+### Groq Configuration:
+- **Model**: llama3-8b-8192
+- **Temperature**: 0.1 (for consistent translations)
+- **Max Tokens**: 1000
+- **System Prompt**: Professional translator role
+
+If the environment variables are not set, the server will return appropriate error messages.
 
 ## Testing
 
 ### Using curl:
+
+#### Test store stats:
+```bash
+curl -X GET "http://localhost:8000/store/stats"
+```
+
+#### Test user data:
+```bash
+curl -X GET "http://localhost:8000/users/chrome_extension_user"
+```
+
+#### Test highlight endpoint:
 ```bash
 curl -X POST "http://localhost:8000/highlight" \
      -H "Content-Type: application/json" \
      -d '{"highlight": "This is a test highlight", "user_id": "test_user"}'
 ```
 
+#### Test translate endpoint:
+```bash
+curl -X POST "http://localhost:8000/translate" \
+     -H "Content-Type: application/json" \
+     -d '{"text": "Hello world"}'
+```
+
 ### Using the interactive docs:
 1. Go to `http://localhost:8000/docs`
-2. Click on the POST `/highlight` endpoint
+2. Click on the desired endpoint
 3. Click "Try it out"
 4. Enter your JSON payload
 5. Click "Execute"
@@ -160,10 +271,10 @@ This enables the Chrome extension to successfully send highlighted text to the s
 
 ## Files
 
-- `main.py` - FastAPI application with highlight endpoint, CORS middleware, and Letta integration
+- `main.py` - FastAPI application with all endpoints, CORS middleware, and API integrations
+- `state_manager.py` - State management module for handling store.json operations
+- `store.json` - Persistent JSON store for user data
 - `load_env.py` - Utility script for testing environment variable loading
-- `requirements.txt` - Python dependencies including python-dotenv
+- `requirements.txt` - Python dependencies including python-dotenv and httpx
 - `env_template.txt` - Template for creating .env file
-- `requirements.txt` - Python dependencies including httpx for HTTP requests
-- `env.example` - Example environment variables file
 - `README.md` - This file 

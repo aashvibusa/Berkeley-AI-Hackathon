@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Glossa</title>
+    <link rel="stylesheet" href="popup.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div id="app">
+        <!-- Loading/Initial Animation -->
+        <div id="loading-screen" class="loading-screen">
+            <div class="app-title">
+                <h1>Glossa</h1>
+                <p>Language Learning Made Simple</p>
+            </div>
+        </div>
+
+        <!-- Login Screen -->
+        <div id="login-screen" class="screen hidden">
+            <div class="header">
+                <h2>Welcome to Glossa</h2>
+                <p>Sign in to continue your language journey</p>
+            </div>
+            
+            <div class="form-container">
+                <div class="form-group">
+                    <label for="login-user-id">User ID</label>
+                    <input type="text" id="login-user-id" placeholder="Enter your user ID">
+                </div>
+                
+                <div class="form-group">
+                    <label for="login-password">Password</label>
+                    <input type="password" id="login-password" placeholder="Enter your password">
+                </div>
+                
+                <button id="login-btn" class="btn btn-primary">
+                    <i class="fas fa-sign-in-alt"></i>
+                    Sign In
+                </button>
+                
+                <div class="divider">
+                    <span>or</span>
+                </div>
+                
+                <button id="show-register-btn" class="btn btn-secondary">
+                    <i class="fas fa-user-plus"></i>
+                    Create New Account
+                </button>
+            </div>
+        </div>
+
+        <!-- Register Screen -->
+        <div id="register-screen" class="screen hidden">
+            <div class="header">
+                <h2>Create Account</h2>
+                <p>Join Glossa and start learning</p>
+            </div>
+            
+            <div class="form-container">
+                <div class="form-group">
+                    <label for="register-user-id">User ID</label>
+                    <input type="text" id="register-user-id" placeholder="Choose a user ID">
+                </div>
+                
+                <div class="form-group">
+                    <label for="register-password">Password</label>
+                    <input type="password" id="register-password" placeholder="Choose a password">
+                </div>
+                
+                <div class="form-group">
+                    <label for="register-confirm-password">Confirm Password</label>
+                    <input type="password" id="register-confirm-password" placeholder="Confirm your password">
+                </div>
+                
+                <button id="register-btn" class="btn btn-primary">
+                    <i class="fas fa-user-plus"></i>
+                    Create Account
+                </button>
+                
+                <button id="show-login-btn" class="btn btn-text">
+                    <i class="fas fa-arrow-left"></i>
+                    Back to Sign In
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Dashboard -->
+        <div id="dashboard-screen" class="screen hidden">
+            <div class="header">
+                <h2>Welcome, <span id="user-display-name">User</span>!</h2>
+                <p>Manage your language preferences</p>
+            </div>
+            
+            <div class="stats-container">
+                <div class="stat-card">
+                    <i class="fas fa-bookmark"></i>
+                    <div class="stat-info">
+                        <span class="stat-number" id="words-count">0</span>
+                        <span class="stat-label">Saved Words</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="language-settings">
+                <h3>Language Settings</h3>
+                
+                <div class="language-group">
+                    <label>Source Language</label>
+                    <div class="language-selector" id="source-language-selector">
+                        <div class="selected-language" id="selected-source">
+                            <img src="https://flagcdn.com/w40/us.png" alt="English">
+                            <span>English</span>
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                        <div class="language-dropdown" id="source-dropdown">
+                            <div class="language-option" data-lang="en" data-flag="us">
+                                <img src="https://flagcdn.com/w40/us.png" alt="English">
+                                <span>English</span>
+                            </div>
+                            <div class="language-option" data-lang="es" data-flag="es">
+                                <img src="https://flagcdn.com/w40/es.png" alt="Spanish">
+                                <span>Spanish</span>
+                            </div>
+                            <div class="language-option" data-lang="fr" data-flag="fr">
+                                <img src="https://flagcdn.com/w40/fr.png" alt="French">
+                                <span>French</span>
+                            </div>
+                            <div class="language-option" data-lang="de" data-flag="de">
+                                <img src="https://flagcdn.com/w40/de.png" alt="German">
+                                <span>German</span>
+                            </div>
+                            <div class="language-option" data-lang="it" data-flag="it">
+                                <img src="https://flagcdn.com/w40/it.png" alt="Italian">
+                                <span>Italian</span>
+                            </div>
+                            <div class="language-option" data-lang="pt" data-flag="pt">
+                                <img src="https://flagcdn.com/w40/pt.png" alt="Portuguese">
+                                <span>Portuguese</span>
+                            </div>
+                            <div class="language-option" data-lang="ja" data-flag="jp">
+                                <img src="https://flagcdn.com/w40/jp.png" alt="Japanese">
+                                <span>Japanese</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="language-group">
+                    <label>Target Language</label>
+                    <div class="language-selector" id="target-language-selector">
+                        <div class="selected-language" id="selected-target">
+                            <img src="https://flagcdn.com/w40/es.png" alt="Spanish">
+                            <span>Spanish</span>
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                        <div class="language-dropdown" id="target-dropdown">
+                            <div class="language-option" data-lang="en" data-flag="us">
+                                <img src="https://flagcdn.com/w40/us.png" alt="English">
+                                <span>English</span>
+                            </div>
+                            <div class="language-option" data-lang="es" data-flag="es">
+                                <img src="https://flagcdn.com/w40/es.png" alt="Spanish">
+                                <span>Spanish</span>
+                            </div>
+                            <div class="language-option" data-lang="fr" data-flag="fr">
+                                <img src="https://flagcdn.com/w40/fr.png" alt="French">
+                                <span>French</span>
+                            </div>
+                            <div class="language-option" data-lang="de" data-flag="de">
+                                <img src="https://flagcdn.com/w40/de.png" alt="German">
+                                <span>German</span>
+                            </div>
+                            <div class="language-option" data-lang="it" data-flag="it">
+                                <img src="https://flagcdn.com/w40/it.png" alt="Italian">
+                                <span>Italian</span>
+                            </div>
+                            <div class="language-option" data-lang="pt" data-flag="pt">
+                                <img src="https://flagcdn.com/w40/pt.png" alt="Portuguese">
+                                <span>Portuguese</span>
+                            </div>
+                            <div class="language-option" data-lang="ja" data-flag="jp">
+                                <img src="https://flagcdn.com/w40/jp.png" alt="Japanese">
+                                <span>Japanese</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="actions">
+                <button id="save-settings-btn" class="btn btn-primary">
+                    <i class="fas fa-save"></i>
+                    Save Settings
+                </button>
+                
+                <button id="logout-btn" class="btn btn-text">
+                    <i class="fas fa-sign-out-alt"></i>
+                    Sign Out
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html> 

@@ -1,21 +1,23 @@
 {
   "manifest_version": 3,
-  "name": "Text Selection Logger",
+  "name": "Glossa - Language Learning",
   "version": "1.0",
-  "description": "Logs highlighted text to the console and sends to server",
+  "description": "Language learning made simple with text highlighting and translation",
   "permissions": [
-    "activeTab"
+    "activeTab",
+    "storage"
   ],
   "host_permissions": [
     "http://localhost:8000/*"
   ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Glossa"
+  },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
       "js": ["content.js"]
     }
-  ],
-  "action": {
-    "default_title": "Text Selection Logger"
-  }
+  ]
 } 

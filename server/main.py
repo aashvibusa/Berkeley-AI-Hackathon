@@ -6,6 +6,7 @@ import os
 import httpx
 from typing import Optional
 from dotenv import load_dotenv
+from state_manager import StateManager
 
 # Load environment variables from .env file
 load_dotenv()
@@ -21,24 +22,295 @@ app.add_middleware(
     allow_headers=["*"],  # Allows all headers
 )
 
-# Environment variables for Letta API
+# Environment variables for APIs
 LETTA_API_KEY = os.getenv("LETTA_API_KEY")
 LETTA_AGENT_ID = os.getenv("LETTA_AGENT_ID")
 LETTA_BASE_URL = "https://api.letta.ai/v1"
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+
+# Initialize state manager
+state_manager = StateManager()
+
+# Language code to full name mapping
+LANGUAGE_MAP = {
+    'en': 'English',
+    'es': 'Spanish',
+    'fr': 'French',
+    'de': 'German',
+    'it': 'Italian',
+    'pt': 'Portuguese',
+    'ja': 'Japanese',
+    'zh': 'Chinese',
+    'ko': 'Korean',
+    'ru': 'Russian',
+    'ar': 'Arabic',
+    'hi': 'Hindi',
+    'auto': 'auto'
+}
+
+def expand_language_code(language_code: str) -> str:
+    """
+    Expand a language code to its full name.
+    If the code is not found, return the original code.
+    """
+    if not language_code:
+        return "auto"
+    
+    # Convert to lowercase for case-insensitive matching
+    code_lower = language_code.lower()
+    
+    # Check if it's already a full name (capitalized)
+    if language_code[0].isupper():
+        return language_code
+    
+    # Look up in the language map
+    return LANGUAGE_MAP.get(code_lower, language_code)
 
 class HighlightRequest(BaseModel):
     highlight: str
     user_id: Optional[str] = "default_user"
 
+class TranslateRequest(BaseModel):
+    text: str
+    user_id: Optional[str] = None
+
+class UserLanguageRequest(BaseModel):
+    user_id: str
+    source_language: Optional[str] = None
+    target_language: Optional[str] = None
+
+class LoginRequest(BaseModel):
+    user_id: str
+    password: str
+
+class RegisterRequest(BaseModel):
+    user_id: str
+    password: str
+
 @app.get("/")
 async def root():
     return {"message": "Highlight Logger API is running!"}
+
+@app.get("/store/stats")
+async def get_store_stats():
+    """Get statistics about the store."""
+    return state_manager.get_store_stats()
+
+@app.get("/users/{user_id}")
+async def get_user_data(user_id: str):
+    """Get user data including languages and highlighted words."""
+    user_data = state_manager.get_user(user_id)
+    return {
+        "user_id": user_id,
+        "data": user_data
+    }
+
+@app.post("/users/register")
+async def register_user(request: RegisterRequest):
+    """Register a new user with hashed password."""
+    try:
+        # Check if user already exists
+        if request.user_id in state_manager.store["users"]:
+            raise HTTPException(status_code=400, detail="User already exists")
+        
+        # Create new user with hashed password
+        state_manager.store["users"][request.user_id] = {
+            "source_language": "auto",
+            "target_language": "Spanish",
+            "highlighted_words": [],
+            "password": request.password  # Store hashed password
+        }
+        
+        # Save to store
+        state_manager.save_store()
+        
+        # Return user data (without password)
+        user_data = state_manager.get_user(request.user_id)
+        user_data.pop("password", None)  # Remove password from response
+        
+        return {
+            "status": "success",
+            "message": "User registered successfully",
+            "user": {
+                "user_id": request.user_id,
+                "data": user_data
+            }
+        }
+    except Exception as e:
+        print(f"Error registering user: {e}")
+        raise HTTPException(status_code=500, detail="Registration failed")
+
+@app.post("/users/login")
+async def login_user(request: LoginRequest):
+    """Login user with password verification."""
+    try:
+        # Check if user exists
+        if request.user_id not in state_manager.store["users"]:
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+        
+        user_data = state_manager.store["users"][request.user_id]
+        stored_password = user_data.get("password", "")
+        
+        # Verify password
+        if stored_password != request.password:
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+        
+        # Return user data (without password)
+        user_data_copy = user_data.copy()
+        user_data_copy.pop("password", None)  # Remove password from response
+        
+        return {
+            "status": "success",
+            "message": "Login successful",
+            "user": {
+                "user_id": request.user_id,
+                "data": user_data_copy
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error logging in user: {e}")
+        raise HTTPException(status_code=500, detail="Login failed")
+
+@app.post("/users/languages")
+async def update_user_languages(request: UserLanguageRequest):
+    """Update user's language preferences."""
+    success = state_manager.update_user_languages(
+        request.user_id, 
+        request.source_language, 
+        request.target_language
+    )
+    if success:
+        return {
+            "status": "success",
+            "message": "User languages updated",
+            "user_id": request.user_id,
+            "data": state_manager.get_user(request.user_id)
+        }
+    else:
+        raise HTTPException(status_code=500, detail="Failed to update user languages")
+
+@app.get("/users/{user_id}/words")
+async def get_user_words(user_id: str):
+    """Get user's highlighted words."""
+    words = state_manager.get_highlighted_words(user_id)
+    return {
+        "user_id": user_id,
+        "highlighted_words": words,
+        "count": len(words)
+    }
+
+@app.delete("/users/{user_id}/words/{word}")
+async def remove_user_word(user_id: str, word: str):
+    """Remove a word from user's highlighted words."""
+    success = state_manager.remove_highlighted_word(user_id, word)
+    if success:
+        return {
+            "status": "success",
+            "message": f"Word '{word}' removed for user {user_id}"
+        }
+    else:
+        raise HTTPException(status_code=500, detail="Failed to remove word")
+
+@app.post("/translate")
+async def translate_endpoint(request: TranslateRequest):
+    """
+    Translates text using Groq API based on user's language preferences.
+    If text is in source language, translate to target. If text is in target language, translate to source.
+    """
+    try:
+        if not GROQ_API_KEY:
+            raise HTTPException(status_code=500, detail="Groq API key not configured")
+        
+        print(f"Received translation request: {request.text}")
+        print(f"Text length: {len(request.text)}")
+        print(f"User ID: {request.user_id}")
+        print("-" * 50)
+        
+        # Get user's language preferences
+        source_language = "auto"
+        target_language = "Spanish"
+        
+        if request.user_id:
+            user_data = state_manager.get_user(request.user_id)
+            print(f"User data: {user_data}")
+            source_language = user_data.get("source_language", "auto")
+            target_language = user_data.get("target_language", "Spanish")
+        
+        # Expand language codes to full names
+        source_language_full = expand_language_code(source_language)
+        target_language_full = expand_language_code(target_language)
+        
+        # Prepare the request for Groq API
+        groq_url = "https://api.groq.com/openai/v1/chat/completions"
+        print(f"Source language: {source_language} -> {source_language_full}")
+        print(f"Target language: {target_language} -> {target_language_full}")
+        
+        # Create dynamic system prompt based on user's language preferences
+        if source_language == "auto":
+            # If source is auto, just translate to target language
+            system_prompt = f"You are a professional translator. Translate the given text to {target_language_full}. Only return the translated text, nothing else."
+        else:
+            # If source is specified, check if text is in source or target language and translate accordingly
+            system_prompt = f"""You are a professional translator. 
+If the text is in {source_language_full}, translate it to {target_language_full}.
+If the text is in {target_language_full}, translate it to {source_language_full}.
+Only return the translated text, nothing else."""
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                groq_url,
+                headers={
+                    "Authorization": f"Bearer {GROQ_API_KEY}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": "llama3-8b-8192",
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": system_prompt
+                        },
+                        {
+                            "role": "user",
+                            "content": request.text
+                        }
+                    ],
+                    "temperature": 0.1,
+                    "max_tokens": 1000
+                },
+                timeout=30.0
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                translated_text = result["choices"][0]["message"]["content"].strip()
+                print(f"Successfully translated: {translated_text}")
+                
+                return {
+                    "status": "success",
+                    "message": "Text translated successfully",
+                    "original_text": request.text,
+                    "translated_text": translated_text,
+                    "source_language": source_language_full,
+                    "target_language": target_language_full
+                }
+            else:
+                print(f"Groq API error: {response.status_code} - {response.text}")
+                raise HTTPException(status_code=response.status_code, detail=f"Groq API error: {response.text}")
+                
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error translating text: {e}")
+        raise HTTPException(status_code=500, detail=f"Translation error: {str(e)}")
 
 @app.post("/highlight")
 async def highlight_endpoint(request: HighlightRequest):
     """
     Receives a JSON object with a 'highlight' key and prints the value.
-    Also forwards the request to Letta server.
+    Also forwards the request to Letta server and saves to store.
     """
     try:
         # Print the highlighted text to console
@@ -47,39 +319,11 @@ async def highlight_endpoint(request: HighlightRequest):
         print(f"User ID: {request.user_id}")
         print("-" * 50)
         
-        # Forward to Letta server if environment variables are set
-        letta_response = None
-        if LETTA_API_KEY and LETTA_AGENT_ID:
-            try:
-                letta_url = f"{LETTA_BASE_URL}/agent/{LETTA_AGENT_ID}/tool/save_vocab/run"
-                print(f"Letta URL: {letta_url}")
-                print(f"Letta API Key: {LETTA_API_KEY}")
-                print(f"Letta Agent ID: {LETTA_AGENT_ID}")
-                print(f"Letta Base URL: {LETTA_BASE_URL}")
-                async with httpx.AsyncClient() as client:
-                    response = await client.post(
-                        letta_url,
-                        headers={
-                            "Authorization": f"Bearer {LETTA_API_KEY}",
-                            "Content-Type": "application/json"
-                        },
-                        json={
-                            "input": request.highlight,
-                            "user_id": request.user_id
-                        },
-                        timeout=30.0
-                    )
-                    
-                    if response.status_code == 200:
-                        letta_response = response.json()
-                        print(f"Successfully sent to Letta: {letta_response}")
-                    else:
-                        print(f"Letta API error: {response.status_code} - {response.text}")
-                        
-            except Exception as e:
-                print(f"Error sending to Letta: {e}")
-        else:
-            print("Letta API credentials not configured. Skipping Letta request.")
+        # Save to store
+        state_manager.add_highlighted_word(request.user_id, request.highlight)
+        
+        # Get updated user data
+        user_data = state_manager.get_user(request.user_id)
         
         # Return a success response
         return {
@@ -88,7 +332,7 @@ async def highlight_endpoint(request: HighlightRequest):
             "highlight": request.highlight,
             "length": len(request.highlight),
             "user_id": request.user_id,
-            "letta_response": letta_response
+            "user_data": user_data
         }
     except Exception as e:
         print(f"Error processing highlight: {e}")

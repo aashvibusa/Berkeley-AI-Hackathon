@@ -1,0 +1,24 @@
+{
+  "users": {
+    "chrome_extension_user": {
+      "source_language": "auto",
+      "target_language": "Spanish",
+      "highlighted_words": [
+        "Create a new organization",
+        "Supabase",
+        "Updates"
+      ]
+    },
+    "kai": {
+      "source_language": "en",
+      "target_language": "ja",
+      "highlighted_words": []
+    },
+    "kai1": {
+      "source_language": "en",
+      "target_language": "ja",
+      "highlighted_words": [],
+      "password": "f4139231c3705847426be9624dbdd975dc640c4e0bb7140071b69cbc1c6b9c74"
+    }
+  }
+}
