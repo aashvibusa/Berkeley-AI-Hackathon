@@ -1,0 +1,1 @@
+# Grabs visible text from current page.

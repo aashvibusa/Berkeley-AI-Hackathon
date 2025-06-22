@@ -1,0 +1,52 @@
+name: LangLearner
+description: A language learning assistant that interacts with user speech, web content, and images to tutor users in real time.
+
+tools:
+  - id: speech_input
+    description: Accepts user speech converted to text.
+    input_type: string
+    output_type: string
+
+  - id: get_context
+    description: Grabs visible text from current page.
+    input_type: null
+    output_type: string
+
+  - id: analyze
+    description: Analyzes screenshot or image to extract text or language context.
+    input_type: image
+    output_type: string
+
+  - id: translate
+    description: Translates or explains language phrases.
+    input_type: string
+    output_type: string
+
+  - id: save
+    description: Saves learned vocabulary or grammar gaps.
+    input_type: string
+    output_type: null
+
+  - id: speech_output
+    description: Converts text response into speech-ready output.
+    input_type: string
+    output_type: string
+
+memory:
+  schema:
+    vocab_log:
+      type: list
+      items: string
+    grammar_gaps:
+      type: list
+      items: string
+
+plan:
+  - tool: speech_input
+  - tool: get_context
+    if: input contains "context" or input contains "page"
+  - tool: analyze
+    if: input contains "image" or input contains "screenshot"
+  - tool: translate
+  - tool: save
+  - tool: speech_output

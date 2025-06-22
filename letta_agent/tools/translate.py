@@ -1,0 +1,1 @@
+# Translates or explains language phrases.
